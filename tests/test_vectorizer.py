@@ -1,5 +1,6 @@
 import unittest
 import tempfile
+import sys
 import numpy as np
 import pandas as pd
 import pyarrow as pa

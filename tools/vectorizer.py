@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 
-import sys
 import torch
-import argparse
-import pandas as pd
 from linformer_pytorch import LinformerLM
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel, BPE
@@ -25,16 +22,16 @@ def create_linformer_model():
         depth=2,              # How many times to run the model
         dropout=0.1,          # How much dropout to apply to P_bar after softmax
         activation="gelu",    # What activation to use
-        checkpoint_level="C0", # What checkpoint level to use
-        parameter_sharing="layerwise", # What level of parameter sharing to use
+        checkpoint_level="C0",  # What checkpoint level to use
+        parameter_sharing="layerwise",  # What level of parameter sharing to use
         k_reduce_by_layer=0,  # Going down depth, how much to reduce dim_k by
-        full_attention=False, # Use full attention instead
-        include_ff=True,     # Whether or not to include the Feed Forward layer
-        w_o_intermediate_dim=None, # If not None, have 2 w_o matrices
-        emb_dim=128,         # Embedding dimension
-        causal=False,        # If you want this to be a causal Linformer
-        method="learnable",  # The method of how to perform the projection
-        ff_intermediate=None # Feed forward intermediate dimension
+        full_attention=False,  # Use full attention instead
+        include_ff=True,      # Whether or not to include the Feed Forward layer
+        w_o_intermediate_dim=None,  # If not None, have 2 w_o matrices
+        emb_dim=128,          # Embedding dimension
+        causal=False,         # If you want this to be a causal Linformer
+        method="learnable",   # The method of how to perform the projection
+        ff_intermediate=None  # Feed forward intermediate dimension
     )
     return model
 
@@ -68,16 +65,13 @@ def process_input(text, tokenizer, model):
     # Tokenize the input
     encoding = tokenizer.encode(text)
     input_ids = encoding.ids[:700]  # Truncate to max length
-    
     # Pad sequence if needed
     if len(input_ids) < 700:
         input_ids = input_ids + [0] * (700 - len(input_ids))
-    
     # Convert to tensor and get embeddings
     input_tensor = torch.tensor(input_ids).unsqueeze(0)  # Add batch dimension
     with torch.no_grad():
         embeddings = model(input_tensor)
-    
     # Return the mean pooled representation
     return embeddings.mean(dim=1).squeeze(0)
 
