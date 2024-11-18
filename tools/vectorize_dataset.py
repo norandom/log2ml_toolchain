@@ -5,9 +5,6 @@ import sys
 import argparse
 import pandas as pd
 from pathlib import Path
-
-# Add parent directory to Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from tools.vectorizer import (
     create_linformer_model,
     create_bpe_tokenizer,

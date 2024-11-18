@@ -1,5 +1,3 @@
-import sys
-import os
 import unittest
 import tempfile
 import numpy as np
@@ -7,9 +5,6 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from io import StringIO, BytesIO
-
-# Add the parent directory to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from tools.vectorizer import (
     create_word_tokenizer,
     create_bpe_tokenizer,

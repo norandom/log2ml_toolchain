@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
-import os
 import sys
-import json
 import argparse
 import subprocess
 import pandas as pd
@@ -81,8 +79,9 @@ def download_dataset():
         sys.exit(1)
 
 def main():
+    """Main function to handle command line arguments and download the dataset."""
     parser = argparse.ArgumentParser(description='Download Log2ML dataset from Kaggle')
-    args = parser.parse_args()
+    parser.parse_args()
     
     check_kaggle_credentials()
     download_dataset()

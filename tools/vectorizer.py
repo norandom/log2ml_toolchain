@@ -3,14 +3,11 @@
 import sys
 import torch
 import argparse
-import numpy as np
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 from linformer_pytorch import LinformerLM
-from tokenizers import Tokenizer, models, trainers, pre_tokenizers
+from tokenizers import Tokenizer
 from tokenizers.models import WordLevel, BPE
-from tokenizers.pre_tokenizers import Whitespace, ByteLevel
+from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.trainers import BpeTrainer
 
 
@@ -50,7 +47,7 @@ def create_word_tokenizer():
 
 
 def create_bpe_tokenizer():
-    """Create a BPE tokenizer with trainer"""
+    """Create and configure a BPE tokenizer"""
     tokenizer = Tokenizer(BPE())
     trainer = BpeTrainer(
         vocab_size=30000,
@@ -61,19 +58,14 @@ def create_bpe_tokenizer():
 
 
 def train_bpe_tokenizer(tokenizer, trainer, text):
-    """Train BPE tokenizer on input text"""
+    """Train a BPE tokenizer on the given text"""
     tokenizer.train_from_iterator([text], trainer=trainer)
     return tokenizer
 
 
-def load_bpe_tokenizer(path):
-    """Load a saved BPE tokenizer"""
-    return Tokenizer.from_file(path)
-
-
 def process_input(text, tokenizer, model):
-    """Process a single line of text into a vector"""
-    # Tokenize input
+    """Process a single text input through the tokenizer and model"""
+    # Tokenize the input
     encoding = tokenizer.encode(text)
     input_ids = encoding.ids[:700]  # Truncate to max length
     
@@ -81,82 +73,15 @@ def process_input(text, tokenizer, model):
     if len(input_ids) < 700:
         input_ids = input_ids + [0] * (700 - len(input_ids))
     
-    # Convert to tensor and get embedding
+    # Convert to tensor and get embeddings
     input_tensor = torch.tensor(input_ids).unsqueeze(0)  # Add batch dimension
     with torch.no_grad():
         embeddings = model(input_tensor)
-
-    # Average pooling over sequence length
-    embeddings = embeddings.mean(dim=1).squeeze(0)
-    return embeddings.numpy()
-
-
-def process_log_file(text, tokenizer, model):
-    """Process log file line by line"""
-    lines = text.strip().split("\n")
-    vectors = []
-
-    for line in lines:
-        if line.strip():
-            vector = process_input(line, tokenizer, model)
-            vectors.append(vector)
-
-    return lines, vectors
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Vectorize log data using Linformer")
-    parser.add_argument(
-        "-bpe",
-        type=str,
-        help="Path to BPE tokenizer JSON file or to save new BPE tokenizer",
-    )
-    args = parser.parse_args()
-
-    # Read input text
-    text = sys.stdin.read()
-
-    # Initialize model
-    model = create_linformer_model()
-
-    # Handle tokenizer initialization
-    if args.bpe:
-        if args.bpe.endswith(".json") and os.path.exists(args.bpe):
-            # Load existing BPE tokenizer
-            tokenizer = load_bpe_tokenizer(args.bpe)
-        else:
-            # Create and train new BPE tokenizer
-            tokenizer, trainer = create_bpe_tokenizer()
-            tokenizer = train_bpe_tokenizer(tokenizer, trainer, text)
-            # Save the trained tokenizer
-            tokenizer.save(args.bpe)
-    else:
-        # Use default word tokenizer
-        tokenizer = create_word_tokenizer()
-
-    # Process the input text line by line
-    lines, vectors = process_log_file(text, tokenizer, model)
-
-    # Convert vectors to list format for proper serialization
-    vectors_list = [v.tolist() for v in vectors]
-
-    # Create DataFrame
-    df = pd.DataFrame({"text": lines, "vector": vectors_list})
-
-    # Write to parquet file using pyarrow
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-
-    # Convert pandas DataFrame to Arrow Table
-    table = pa.Table.from_pandas(df)
-
-    # Write to a temporary buffer first
-    buffer = pa.BufferOutputStream()
-    pq.write_table(table, buffer)
-
-    # Write the buffer contents to stdout
-    sys.stdout.buffer.write(buffer.getvalue().to_pybytes())
+    
+    # Return the mean pooled representation
+    return embeddings.mean(dim=1).squeeze(0)
 
 
 if __name__ == "__main__":
-    main()
+    print("This module provides vectorization utilities for the Log2ML toolchain.")
+    print("It is not meant to be run directly.")
