@@ -37,8 +37,16 @@ def create_linformer_model():
 
 
 def create_word_tokenizer():
-    """Create a simple word-level tokenizer"""
-    tokenizer = Tokenizer(WordLevel())
+    """Create a simple word-level tokenizer with a basic vocabulary"""
+    # Create a basic vocabulary with special tokens
+    vocab = {
+        "[PAD]": 0,
+        "[UNK]": 1,
+        "[CLS]": 2,
+        "[SEP]": 3,
+        "[MASK]": 4,
+    }
+    tokenizer = Tokenizer(WordLevel(vocab=vocab, unk_token="[UNK]"))
     tokenizer.pre_tokenizer = Whitespace()
     return tokenizer
 
@@ -71,9 +79,13 @@ def process_input(text, tokenizer, model):
     # Convert to tensor and get embeddings
     input_tensor = torch.tensor(input_ids).unsqueeze(0)  # Add batch dimension
     with torch.no_grad():
-        embeddings = model(input_tensor)
-    # Return the mean pooled representation
-    return embeddings.mean(dim=1).squeeze(0)
+        # Get the embeddings from the token embedding layer
+        embeddings = model.to_token_emb(input_tensor)
+        # Apply positional embeddings
+        embeddings = model.pos_emb(embeddings)
+        # Get the mean pooled representation
+        embeddings = embeddings.mean(dim=1).squeeze(0)
+    return embeddings
 
 
 if __name__ == "__main__":
