@@ -6,6 +6,9 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Ensure output directories exist
+mkdir -p data tokenizer
+
 echo -e "${BLUE}Log2ML Toolchain - Vectorizer Demo${NC}"
 echo "=================================="
 echo
@@ -35,10 +38,10 @@ print(f'Vector (first 10 dimensions): {vector_preview}...')
 
 # Default word tokenization
 echo -e "${GREEN}1. Using default word tokenization...${NC}"
-cat sample_data/sample_logs.log | ./tools/vectorizer > vectorized_logs_word.parquet
+cat sample_data/sample_logs.log | ./tools/vectorizer > data/vectorized_logs_word.parquet
 
 if [ $? -eq 0 ]; then
-    display_last_entry "vectorized_logs_word.parquet" "Last entry (word tokenization):"
+    display_last_entry "data/vectorized_logs_word.parquet" "Last entry (word tokenization):"
 else
     echo "Error during word tokenization vectorization"
     exit 1
@@ -46,10 +49,10 @@ fi
 
 # BPE tokenization (training new tokenizer)
 echo -e "${GREEN}2. Training and using BPE tokenization...${NC}"
-cat sample_data/sample_logs.log | ./tools/vectorizer -bpe tokenizer.json > vectorized_logs_bpe.parquet
+cat sample_data/sample_logs.log | ./tools/vectorizer -bpe tokenizer/tokenizer.json > data/vectorized_logs_bpe.parquet
 
 if [ $? -eq 0 ]; then
-    display_last_entry "vectorized_logs_bpe.parquet" "Last entry (BPE tokenization):"
+    display_last_entry "data/vectorized_logs_bpe.parquet" "Last entry (BPE tokenization):"
 else
     echo "Error during BPE tokenization vectorization"
     exit 1
@@ -57,10 +60,10 @@ fi
 
 # Using saved BPE tokenizer
 echo -e "${GREEN}3. Using saved BPE tokenizer...${NC}"
-cat sample_data/sample_logs.log | ./tools/vectorizer -bpe tokenizer.json > vectorized_logs_bpe2.parquet
+cat sample_data/sample_logs.log | ./tools/vectorizer -bpe tokenizer/tokenizer.json > data/vectorized_logs_bpe2.parquet
 
 if [ $? -eq 0 ]; then
-    display_last_entry "vectorized_logs_bpe2.parquet" "Last entry (saved BPE tokenizer):"
+    display_last_entry "data/vectorized_logs_bpe2.parquet" "Last entry (saved BPE tokenizer):"
 else
     echo "Error during second BPE tokenization vectorization"
     exit 1

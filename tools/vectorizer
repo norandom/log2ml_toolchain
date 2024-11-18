@@ -1,114 +1,116 @@
 #!/usr/bin/env python3
 
-import sys
-import torch
-import argparse
-from linformer_pytorch import LinformerLM
-from tokenizers import Tokenizer, models, trainers, pre_tokenizers
-from tokenizers.models import WordLevel, BPE
-from tokenizers.pre_tokenizers import Whitespace, ByteLevel
-from tokenizers.trainers import BpeTrainer
-import pandas as pd
-import json
 import os
+import sys
+import argparse
+import torch
+import numpy as np
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+from linformer import LinformerEncoder
+from tokenizers import Tokenizer, trainers
+from tokenizers.models import BPE
+from tokenizers.pre_tokenizers import Whitespace
 
-def create_bpe_tokenizer(vocab_size=30000):
-    """Create a new BPE tokenizer"""
-    tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
-    tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=True)
-    trainer = BpeTrainer(
-        vocab_size=vocab_size,
-        special_tokens=["[UNK]", "[PAD]"],
-        show_progress=True
-    )
-    return tokenizer, trainer
-
-def load_bpe_tokenizer(json_path):
-    """Load a BPE tokenizer from a JSON file"""
-    try:
-        tokenizer = Tokenizer.from_file(json_path)
-        return tokenizer
-    except Exception as e:
-        print(f"Error loading tokenizer from {json_path}: {e}", file=sys.stderr)
-        sys.exit(1)
-
-def create_word_tokenizer():
-    """Create a basic word-level tokenizer"""
-    vocab = {"[UNK]": 0, "[PAD]": 1}
-    vocab.update({str(i): i+2 for i in range(10)})
-    vocab.update({c: i+12 for i, c in enumerate(".,!?:;'\"()[]{}+-*/=<>@#$%^&|\\")})
-    
-    tokenizer = Tokenizer(WordLevel(vocab=vocab, unk_token="[UNK]"))
-    tokenizer.pre_tokenizer = Whitespace()
-    return tokenizer
 
 def create_linformer_model():
-    model = LinformerLM(
-        num_tokens=30000,
-        input_size=700,
-        channels=64,
-        dim_d=None,
-        dim_k=128,
-        dim_ff=128,
-        dropout_ff=0.15,
-        nhead=4,
+    """Create and initialize Linformer model for vectorization"""
+    model = LinformerEncoder(
+        dim=64,
+        seq_len=700,
         depth=2,
-        dropout=0.1,
-        activation="gelu",
-        parameter_sharing="layerwise",
-        method="learnable"
+        heads=4,
+        k=64,
+        one_kv_head=True,
+        share_kv=True,
     )
     return model
 
-def process_input(text, tokenizer, model, max_length=700):
-    # Tokenize the text
-    encoded = tokenizer.encode(text)
-    tokens = encoded.ids
-    
-    # Pad or truncate to max_length
-    if len(tokens) < max_length:
-        tokens = tokens + [0] * (max_length - len(tokens))
-    else:
+
+def create_word_tokenizer():
+    """Create a simple word-level tokenizer"""
+    tokenizer = Tokenizer(BPE())
+    tokenizer.pre_tokenizer = Whitespace()
+    return tokenizer
+
+
+def create_bpe_tokenizer():
+    """Create a BPE tokenizer with trainer"""
+    tokenizer = Tokenizer(BPE())
+    trainer = trainers.BpeTrainer(
+        vocab_size=30000,
+        min_frequency=2,
+        special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"],
+    )
+    return tokenizer, trainer
+
+
+def train_bpe_tokenizer(tokenizer, trainer, text):
+    """Train BPE tokenizer on input text"""
+    tokenizer.train_from_iterator([text], trainer=trainer)
+    return tokenizer
+
+
+def load_bpe_tokenizer(path):
+    """Load a saved BPE tokenizer"""
+    return Tokenizer.from_file(path)
+
+
+def process_input(text, tokenizer, model):
+    """Process a single line of text into a vector"""
+    # Tokenize input
+    encoding = tokenizer.encode(text)
+    tokens = encoding.ids
+
+    # Pad or truncate to fixed length
+    max_length = 700
+    if len(tokens) > max_length:
         tokens = tokens[:max_length]
-    
+    else:
+        tokens = tokens + [0] * (max_length - len(tokens))
+
     # Convert to tensor and get embedding
     tokens_tensor = torch.tensor(tokens).unsqueeze(0)
     with torch.no_grad():
-        embedding = model(tokens_tensor)
-        # Flatten the embedding
-        embedding = embedding.squeeze(0).mean(dim=0)
-        
-    return embedding.numpy()
+        vector = model(tokens_tensor)
+
+    # Average pooling over sequence length
+    vector = vector.mean(dim=1).squeeze().numpy()
+    return vector
+
 
 def process_log_file(text, tokenizer, model):
-    """Process the log file line by line"""
-    lines = text.strip().split('\n')
+    """Process log file line by line"""
+    lines = text.strip().split("\n")
     vectors = []
+
     for line in lines:
         if line.strip():
             vector = process_input(line, tokenizer, model)
             vectors.append(vector)
+
     return lines, vectors
 
-def train_bpe_tokenizer(tokenizer, trainer, input_text):
-    """Train a BPE tokenizer on the input text"""
-    tokenizer.train_from_iterator([input_text], trainer=trainer)
-    return tokenizer
 
 def main():
-    parser = argparse.ArgumentParser(description='Vectorize log data using Linformer')
-    parser.add_argument('-bpe', type=str, help='Path to BPE tokenizer JSON file or to save new BPE tokenizer')
+    parser = argparse.ArgumentParser(description="Vectorize log data using Linformer")
+    parser.add_argument(
+        "-bpe",
+        type=str,
+        help="Path to BPE tokenizer JSON file or to save new BPE tokenizer",
+    )
     args = parser.parse_args()
 
     # Read input text
     text = sys.stdin.read()
-    
+
     # Initialize model
     model = create_linformer_model()
-    
+
     # Handle tokenizer initialization
     if args.bpe:
-        if args.bpe.endswith('.json') and os.path.exists(args.bpe):
+        if args.bpe.endswith(".json") and os.path.exists(args.bpe):
             # Load existing BPE tokenizer
             tokenizer = load_bpe_tokenizer(args.bpe)
         else:
@@ -120,28 +122,30 @@ def main():
     else:
         # Use default word tokenizer
         tokenizer = create_word_tokenizer()
-    
+
     # Process the input text line by line
     lines, vectors = process_log_file(text, tokenizer, model)
-    
+
     # Convert vectors to list format for proper serialization
     vectors_list = [v.tolist() for v in vectors]
-    
-    # Create DataFrame and save as parquet
-    df = pd.DataFrame({
-        'text': lines,
-        'vector': vectors_list
-    })
-    
-    # Use pyarrow to write the parquet file
+
+    # Create DataFrame
+    df = pd.DataFrame({"text": lines, "vector": vectors_list})
+
+    # Write to parquet file using pyarrow
     import pyarrow as pa
     import pyarrow.parquet as pq
-    
-    # Convert DataFrame to PyArrow Table
+
+    # Convert pandas DataFrame to Arrow Table
     table = pa.Table.from_pandas(df)
-    
-    # Write to stdout buffer
-    pq.write_table(table, sys.stdout.buffer)
+
+    # Write to a temporary buffer first
+    buffer = pa.BufferOutputStream()
+    pq.write_table(table, buffer)
+
+    # Write the buffer contents to stdout
+    sys.stdout.buffer.write(buffer.getvalue().to_pybytes())
+
 
 if __name__ == "__main__":
     main()

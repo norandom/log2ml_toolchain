@@ -1,0 +1,10 @@
+[2024-03-18 10:15:23] INFO [system.service] Service started successfully
+[2024-03-18 10:15:24] DEBUG [auth.module] User authentication attempt from IP: 192.168.1.100
+[2024-03-18 10:15:25] WARNING [security.monitor] Multiple failed login attempts detected
+[2024-03-18 10:15:26] ERROR [database.connector] Failed to connect to database: Connection timeout
+[2024-03-18 10:15:27] INFO [file.handler] Processing file: important_document.pdf
+[2024-03-18 10:15:28] INFO [network.monitor] Network latency: 150ms
+[2024-03-18 10:15:29] CRITICAL [security.alert] Potential security breach detected from IP: 10.0.0.5
+[2024-03-18 10:15:30] INFO [system.metrics] CPU usage: 75%, Memory: 8.5GB/16GB
+[2024-03-18 10:15:31] DEBUG [cache.manager] Cache hit ratio: 0.85
+[2024-03-18 10:15:32] WARNING [disk.monitor] Low disk space on /dev/sda1: 10% remaining

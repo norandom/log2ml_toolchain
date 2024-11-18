@@ -1,52 +1,71 @@
 # Log2ML Toolchain
 
-A collection of tools for converting log data into machine learning-ready formats.
+A command-line tool for converting log files into machine learning-ready vector representations using Linformer.
 
-## Tools
+## Features
 
-### Vectorizer
+- Convert log files to fixed-size vector representations
+- Support for both word-level and BPE tokenization
+- Output in Parquet format with original text and vectors
+- Pipe-compatible for Unix-style workflows
+- Configurable tokenization and model parameters
 
-The vectorizer tool converts log file entries into vector representations using Linformer. It supports both word-level and BPE (Byte-Pair Encoding) tokenization.
+## Quick Start
 
-#### Features
-
-- Line-by-line log file processing
-- Word-level tokenization (default)
-- BPE tokenization with training capability
-- Parquet output format with both text and vector data
-- Linformer-based vectorization with configurable parameters
-
-#### Usage
-
-1. Default word tokenization:
 ```bash
-cat logfile.log | ./tools/vectorizer > output.parquet
+# Basic usage with word tokenization
+cat sample_data/sample_logs.log | ./tools/vectorizer > data/vectors.parquet
+
+# Using BPE tokenization (training new tokenizer)
+cat sample_data/sample_logs.log | ./tools/vectorizer -bpe tokenizer/my_tokenizer.json > data/vectors_bpe.parquet
+
+# Using pre-trained BPE tokenizer
+cat sample_data/sample_logs.log | ./tools/vectorizer -bpe tokenizer/existing_tokenizer.json > data/vectors_bpe2.parquet
 ```
 
-2. Train and use BPE tokenization:
+## Installation
+
+### Prerequisites
+
+- Python 3.10 or 3.11
+- CUDA-capable GPU (recommended)
+- Unix-like system
+
+### Setup
+
+1. Clone the repository:
 ```bash
-cat logfile.log | ./tools/vectorizer -bpe tokenizer.json > output.parquet
+git clone https://github.com/yourusername/log2ml_toolchain.git
+cd log2ml_toolchain
 ```
 
-3. Use existing BPE tokenizer:
+2. Install dependencies:
 ```bash
-cat logfile.log | ./tools/vectorizer -bpe existing_tokenizer.json > output.parquet
+pip install -r requirements.txt
 ```
 
-#### Output Format
+## Technical Details
 
-The tool generates a Parquet file containing:
-- `text`: Original log entry text
-- `vector`: Vector representation (30,000 dimensions)
+### Model Architecture
 
-#### Model Configuration
+- **Tokenization**:
+  - Word-level tokenizer (default)
+  - BPE tokenizer with configurable vocabulary
+  - Special token support: [PAD], [UNK], [CLS], [SEP], [MASK]
 
-- Vocabulary Size: 30,000 tokens
-- Maximum Sequence Length: 700
-- Embedding Dimension: 64
-- Attention Heads: 4
-- Transformer Layers: 2
-- Activation: GELU
+- **Linformer Configuration**:
+  - Vocabulary Size: 30,000 tokens
+  - Maximum Sequence Length: 700 tokens
+  - Embedding Dimensions: 64 channels
+  - Attention Heads: 4
+  - Transformer Layers: 2
+  - Activation: GELU
+
+### Output Format
+
+The tool outputs Parquet files with two columns:
+- `text`: Original log line
+- `vector`: Fixed-size vector representation (30,000 dimensions)
 
 ## Directory Structure
 
@@ -54,88 +73,56 @@ The tool generates a Parquet file containing:
 log2ml_toolchain/
 ├── tools/
 │   └── vectorizer        # Main vectorization tool
+├── data/
+│   └── *.parquet        # Generated vector data files
+├── tokenizer/
+│   └── *.json          # Trained tokenizer files
 ├── sample_data/
-│   └── sample_logs.log   # Example log file
+│   └── sample_logs.log  # Example log file
+├── tests/
+│   └── test_vectorizer.py  # Test suite
 ├── requirements.txt      # Python dependencies
+├── requirements-dev.txt  # Development dependencies
 └── vectorizer_demo.sh    # Demo script
 ```
-
-## Installation
-
-1. Clone the repository
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-## Demo
-
-Run the demo script to see the vectorizer in action:
-```bash
-./vectorizer_demo.sh
-```
-
-The demo shows:
-1. Default word tokenization
-2. Training and using a new BPE tokenizer
-3. Reusing a saved BPE tokenizer
-
-## Dependencies
-
-- torch
-- linformer-pytorch
-- pandas
-- pyarrow
-- tokenizers
 
 ## Development
 
 ### Setup Development Environment
 
-1. Clone the repository
-2. Install development dependencies:
+1. Install development dependencies:
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt
 ```
 
 ### Running Tests
 
-Run the test suite:
 ```bash
+# Run test suite
 pytest tests/
-```
 
-Run tests with coverage:
-```bash
+# Run with coverage
 pytest tests/ --cov=tools --cov-report=term-missing
 ```
 
 ### Code Quality
 
-Format code:
 ```bash
+# Format code
 black tools/ tests/
 isort tools/ tests/
-```
 
-Run linting:
-```bash
+# Run linting
 flake8 tools/ tests/ --max-line-length=100
 ```
 
 ## CI/CD
 
-This project uses GitHub Actions for continuous integration and delivery. The pipeline includes:
-
-1. Testing
-   - Runs test suite on Python 3.8, 3.9, 3.10, and 3.11
-   - Generates coverage reports
-   - Uploads coverage to Codecov
-
-2. Linting
-   - Black for code formatting
-   - isort for import sorting
-   - flake8 for code quality
+GitHub Actions workflow includes:
+- Testing on Python 3.10 and 3.11
+- Code coverage reporting
+- Automatic code formatting
+- Linting checks
 
 ## Contributing
 
@@ -145,6 +132,22 @@ This project uses GitHub Actions for continuous integration and delivery. The pi
 4. Run tests and linting
 5. Submit a pull request
 
+## Dependencies
+
+### Core Dependencies
+- torch (>=2.0.0)
+- linformer-pytorch (>=0.1.0)
+- pandas (>=2.0.0)
+- pyarrow (>=14.0.1)
+- tokenizers (>=0.15.0)
+
+### Development Dependencies
+- pytest (>=7.0.0)
+- black (>=23.0.0)
+- isort (>=5.12.0)
+- flake8 (>=6.0.0)
+- coverage (>=7.0.0)
+
 ## License
 
-MIT License
+MIT License - see [LICENSE](LICENSE) for details
