@@ -1,0 +1,5 @@
+torch>=2.0.0
+linformer-pytorch>=0.1.0
+pandas>=2.0.0
+pyarrow>=14.0.1
+tokenizers>=0.15.0
