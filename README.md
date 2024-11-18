@@ -1,6 +1,6 @@
 ![Python](https://img.shields.io/badge/python-3.11-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0.0-EE4C2C.svg)
-![Build and Test](https://github.com/norandom/log2ml_toolchain/actions/workflows/build-and-test.yml/badge.svg)
+[![Build and Test](https://github.com/norandom/log2ml_toolchain/actions/workflows/build.yml/badge.svg)](https://github.com/norandom/log2ml_toolchain/actions/workflows/build.yml)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Code Style](https://img.shields.io/badge/code%20style-flake8-black)
 ![Status](https://img.shields.io/badge/status-beta-yellow)
