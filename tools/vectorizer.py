@@ -1,36 +1,50 @@
 #!/usr/bin/env python3
 
-import os
 import sys
-import argparse
 import torch
+import argparse
 import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from linformer import LinformerEncoder
-from tokenizers import Tokenizer, trainers
-from tokenizers.models import BPE
-from tokenizers.pre_tokenizers import Whitespace
+from linformer_pytorch import LinformerLM
+from tokenizers import Tokenizer, models, trainers, pre_tokenizers
+from tokenizers.models import WordLevel, BPE
+from tokenizers.pre_tokenizers import Whitespace, ByteLevel
+from tokenizers.trainers import BpeTrainer
 
 
 def create_linformer_model():
     """Create and initialize Linformer model for vectorization"""
-    model = LinformerEncoder(
-        dim=64,
-        seq_len=700,
-        depth=2,
-        heads=4,
-        k=64,
-        one_kv_head=True,
-        share_kv=True,
+    model = LinformerLM(
+        num_tokens=30000,      # Number of tokens in the LM
+        input_size=700,        # Dimension 1 of the input
+        channels=64,           # Dimension 2 of the input
+        dim_d=None,           # Overwrites the inner dim of the attention heads
+        dim_k=128,            # The second dimension of the P_bar matrix
+        dim_ff=128,           # Dimension in the feed forward network
+        dropout_ff=0.15,      # Dropout for feed forward network
+        nhead=4,              # Number of attention heads
+        depth=2,              # How many times to run the model
+        dropout=0.1,          # How much dropout to apply to P_bar after softmax
+        activation="gelu",    # What activation to use
+        checkpoint_level="C0", # What checkpoint level to use
+        parameter_sharing="layerwise", # What level of parameter sharing to use
+        k_reduce_by_layer=0,  # Going down depth, how much to reduce dim_k by
+        full_attention=False, # Use full attention instead
+        include_ff=True,     # Whether or not to include the Feed Forward layer
+        w_o_intermediate_dim=None, # If not None, have 2 w_o matrices
+        emb_dim=128,         # Embedding dimension
+        causal=False,        # If you want this to be a causal Linformer
+        method="learnable",  # The method of how to perform the projection
+        ff_intermediate=None # Feed forward intermediate dimension
     )
     return model
 
 
 def create_word_tokenizer():
     """Create a simple word-level tokenizer"""
-    tokenizer = Tokenizer(BPE())
+    tokenizer = Tokenizer(WordLevel())
     tokenizer.pre_tokenizer = Whitespace()
     return tokenizer
 
@@ -38,7 +52,7 @@ def create_word_tokenizer():
 def create_bpe_tokenizer():
     """Create a BPE tokenizer with trainer"""
     tokenizer = Tokenizer(BPE())
-    trainer = trainers.BpeTrainer(
+    trainer = BpeTrainer(
         vocab_size=30000,
         min_frequency=2,
         special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"],
@@ -61,23 +75,20 @@ def process_input(text, tokenizer, model):
     """Process a single line of text into a vector"""
     # Tokenize input
     encoding = tokenizer.encode(text)
-    tokens = encoding.ids
-
-    # Pad or truncate to fixed length
-    max_length = 700
-    if len(tokens) > max_length:
-        tokens = tokens[:max_length]
-    else:
-        tokens = tokens + [0] * (max_length - len(tokens))
-
+    input_ids = encoding.ids[:700]  # Truncate to max length
+    
+    # Pad sequence if needed
+    if len(input_ids) < 700:
+        input_ids = input_ids + [0] * (700 - len(input_ids))
+    
     # Convert to tensor and get embedding
-    tokens_tensor = torch.tensor(tokens).unsqueeze(0)
+    input_tensor = torch.tensor(input_ids).unsqueeze(0)  # Add batch dimension
     with torch.no_grad():
-        vector = model(tokens_tensor)
+        embeddings = model(input_tensor)
 
     # Average pooling over sequence length
-    vector = vector.mean(dim=1).squeeze().numpy()
-    return vector
+    embeddings = embeddings.mean(dim=1).squeeze(0)
+    return embeddings.numpy()
 
 
 def process_log_file(text, tokenizer, model):

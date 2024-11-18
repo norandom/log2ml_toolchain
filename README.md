@@ -27,7 +27,7 @@ cat sample_data/sample_logs.log | ./tools/vectorizer -bpe tokenizer/existing_tok
 
 ### Prerequisites
 
-- Python 3.10 or 3.11
+- Python 3.11
 - CUDA-capable GPU (recommended)
 - Unix-like system
 
@@ -86,6 +86,46 @@ log2ml_toolchain/
 └── vectorizer_demo.sh    # Demo script
 ```
 
+## Dataset
+
+The project includes scripts to download and process the [Log2ML Blindtest Maldoc Activity Dataset](https://www.kaggle.com/datasets/mariusciepluch/log2ml-blindtest-maldoc-activity-capture) from Kaggle.
+
+### Setup Kaggle Access
+
+1. Create a Kaggle account at https://www.kaggle.com
+2. Go to your account settings (https://www.kaggle.com/account)
+3. Click 'Create New API Token' to download `kaggle.json`
+4. Set up the credentials file:
+```bash
+mkdir -p ~/.kaggle
+mv kaggle.json ~/.kaggle/
+chmod 600 ~/.kaggle/kaggle.json
+```
+
+### Download and Process Dataset
+
+1. Download the dataset:
+```bash
+./tools/download_dataset.py
+```
+
+2. Vectorize the messages:
+```bash
+./tools/vectorize_dataset.py
+```
+
+This will:
+- Download the dataset to `data/`
+- Create and train a BPE tokenizer
+- Save the tokenizer to `tokenizer/dataset_tokenizer.json`
+- Generate vectors for all messages
+- Save the results to `data/vectorized_messages.parquet`
+
+You can customize the paths:
+```bash
+./tools/vectorize_dataset.py --input custom_input.csv --output custom_output.parquet --tokenizer custom_tokenizer.json
+```
+
 ## Development
 
 ### Setup Development Environment
@@ -119,7 +159,7 @@ flake8 tools/ tests/ --max-line-length=100
 ## CI/CD
 
 GitHub Actions workflow includes:
-- Testing on Python 3.10 and 3.11
+- Testing on Python 3.11
 - Code coverage reporting
 - Automatic code formatting
 - Linting checks
