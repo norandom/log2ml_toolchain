@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "log2ml"
 version = "0.1.0"
 description = "A toolchain for converting log data into machine learning models using vector embeddings"
-readme = "README.md"
+readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
