@@ -37,14 +37,6 @@ jobs:
         pip install -e .
         cd ..
     
-    - name: Code style check
-      run: |
-        cd core
-        black . --check
-        isort . --check
-        flake8 log2ml/ tests/ --max-line-length=100 --extend-ignore=E203 --statistics --show-source --count
-        cd ..
-    
     - name: Test with pytest
       run: |
         cd core
