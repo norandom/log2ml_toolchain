@@ -147,70 +147,63 @@ jobs:
           libgtk-3-common \
           libgtk-3-bin \
           libgdk3.0-cil \
-          libgdk3.0-cil-dev
+          libgdk3.0-cil-dev \
+          libgdk-pixbuf2.0-0 \
+          libgdk-pixbuf2.0-common \
+          libgdk-pixbuf2.0-dev
 
     - name: Configure pkg-config and environment (ubuntu only)
       if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
       run: |
-        # Find pkg-config files
-        echo "Finding pkg-config files..."
-        PKG_CONFIG_FILES=$(find /usr -name "*.pc" 2>/dev/null || true)
+        # Create a list of potential pkg-config paths
+        PKG_CONFIG_PATHS=(
+          "/usr/lib/x86_64-linux-gnu/pkgconfig"
+          "/usr/share/pkgconfig"
+          "/usr/lib/pkgconfig"
+          "/usr/local/lib/pkgconfig"
+          "/usr/local/share/pkgconfig"
+          "/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders"
+        )
         
-        # Extract unique directories containing .pc files
-        PKG_CONFIG_PATHS=$(echo "$PKG_CONFIG_FILES" | xargs -I {} dirname {} | sort -u | tr '\n' ':')
+        # Export PKG_CONFIG_PATH
+        export PKG_CONFIG_PATH=$(IFS=:; echo "${PKG_CONFIG_PATHS[*]}")
+        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
         
-        # Set environment variables
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATHS" >> $GITHUB_ENV
-        echo "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1" >> $GITHUB_ENV
-        echo "PKG_CONFIG_ALLOW_SYSTEM_LIBS=1" >> $GITHUB_ENV
+        # Set additional environment variables
+        echo "GDK_PIXBUF_MODULEDIR=/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders" >> $GITHUB_ENV
+        echo "GDK_PIXBUF_MODULE_FILE=/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders.cache" >> $GITHUB_ENV
         
-        # Export for current shell
-        export PKG_CONFIG_PATH="$PKG_CONFIG_PATHS"
-        export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1
-        export PKG_CONFIG_ALLOW_SYSTEM_LIBS=1
+        # Update GDK pixbuf loaders cache
+        sudo gdk-pixbuf-query-loaders --update-cache
         
-        # Debug information
-        echo "PKG_CONFIG_PATH directories:"
-        echo "$PKG_CONFIG_PATHS" | tr ':' '\n'
-        
-        echo "Checking for specific .pc files:"
-        for pc in atk gdk-3.0 gtk+-3.0; do
-          echo "Looking for $pc.pc..."
-          find /usr -name "$pc.pc" 2>/dev/null || echo "$pc.pc not found"
-          if pkg-config --exists $pc; then
-            echo "$pc found by pkg-config"
-            echo "Version: $(pkg-config --modversion $pc)"
-            echo "Cflags: $(pkg-config --cflags $pc)"
-            echo "Libs: $(pkg-config --libs $pc)"
-          else
-            echo "$pc not found by pkg-config"
+        # Create symbolic links for important .pc files if they don't exist in standard locations
+        for pc_file in atk.pc gdk-3.0.pc gtk+-3.0.pc; do
+          source_file=$(find /usr -name "$pc_file" 2>/dev/null | head -n 1)
+          if [ -n "$source_file" ]; then
+            for pkg_dir in "${PKG_CONFIG_PATHS[@]}"; do
+              sudo mkdir -p "$pkg_dir"
+              if [ ! -f "$pkg_dir/$pc_file" ]; then
+                sudo ln -sf "$source_file" "$pkg_dir/$pc_file"
+                echo "Created symlink for $pc_file in $pkg_dir"
+              fi
+            done
           fi
         done
         
-        # Create symbolic links if needed
-        for dir in /usr/lib/x86_64-linux-gnu/pkgconfig /usr/share/pkgconfig; do
-          sudo mkdir -p $dir
-          if [ -f /usr/lib/x86_64-linux-gnu/pkgconfig/atk.pc ] && [ ! -f $dir/atk.pc ]; then
-            sudo ln -s /usr/lib/x86_64-linux-gnu/pkgconfig/atk.pc $dir/atk.pc
-          fi
-          if [ -f /usr/lib/x86_64-linux-gnu/pkgconfig/gdk-3.0.pc ] && [ ! -f $dir/gdk-3.0.pc ]; then
-            sudo ln -s /usr/lib/x86_64-linux-gnu/pkgconfig/gdk-3.0.pc $dir/gdk-3.0.pc
-          fi
-        done
+        # Verify GDK and GTK installation
+        echo "Verifying GDK/GTK installation:"
+        pkg-config --modversion gdk-3.0 || echo "gdk-3.0 not found"
+        pkg-config --modversion gtk+-3.0 || echo "gtk+-3.0 not found"
         
-        echo "System package status:"
-        dpkg -l | grep -E 'libgtk|libgdk|libatk|gtk|gdk|atk'
-
-    - name: Verify package configuration
-      if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
-      run: |
-        echo "Testing pkg-config with required packages..."
-        pkg-config --cflags --libs atk || echo "atk pkg-config failed"
-        pkg-config --cflags --libs gdk-3.0 || echo "gdk-3.0 pkg-config failed"
-        pkg-config --cflags --libs gtk+-3.0 || echo "gtk+-3.0 pkg-config failed"
+        echo "Package locations:"
+        find /usr -name "gdk*.pc" 2>/dev/null || echo "No GDK .pc files found"
+        find /usr -name "gtk*.pc" 2>/dev/null || echo "No GTK .pc files found"
         
-        echo "Library locations:"
-        ldconfig -p | grep -E 'libgtk|libgdk|libatk'
+        echo "Library status:"
+        ldconfig -p | grep -E "libgdk|libgtk"
+        
+        echo "Package config paths:"
+        pkg-config --variable pc_path pkg-config
 
     - name: Create valid icon for Windows
       if: ${{ steps.check_gui.outputs.gui_exists == 'true' && matrix.platform == 'windows-latest' }}
@@ -220,88 +213,49 @@ jobs:
         $iconDir = "gui/vector-analyzer/src-tauri/icons"
         New-Item -ItemType Directory -Force -Path $iconDir
 
-        # Create a minimal valid 16x16 ICO file (smallest possible valid ICO)
+        # Create a 1x1 pixel ICO file (absolute minimum size)
         $icoBytes = @(
           # ICO Header (6 bytes)
-          0x00, 0x00,  # Reserved (0)
+          0x00, 0x00,  # Reserved
           0x01, 0x00,  # Type (1 = ICO)
-          0x01, 0x00,  # Number of images (1)
+          0x01, 0x00,  # Number of images
 
-          # Image Directory Entry (16 bytes)
-          0x10, 0x00,  # Width (16 pixels)
-          0x10, 0x00,  # Height (16 pixels)
-          0x00,        # Color palette (0 = no palette)
-          0x00,        # Reserved (0)
-          0x01, 0x00,  # Color planes (1)
+          # Directory Entry (16 bytes)
+          0x01, 0x00,  # Width (1 pixel)
+          0x01, 0x00,  # Height (1 pixel)
+          0x00,        # Color palette
+          0x00,        # Reserved
+          0x01, 0x00,  # Color planes
           0x01, 0x00,  # Bits per pixel (1)
-          0x28, 0x01, 0x00, 0x00,  # Size of image data (296 bytes)
-          0x16, 0x00, 0x00, 0x00,  # Offset to image data (22 bytes)
+          0x2C, 0x00, 0x00, 0x00,  # Size of image data (44 bytes)
+          0x16, 0x00, 0x00, 0x00,  # Offset to image data
 
-          # DIB Header (40 bytes)
-          0x28, 0x00, 0x00, 0x00,  # Header size (40 bytes)
-          0x10, 0x00, 0x00, 0x00,  # Width (16 pixels)
-          0x20, 0x00, 0x00, 0x00,  # Height (32 pixels = 16 * 2 for XOR and AND masks)
-          0x01, 0x00,              # Planes (1)
-          0x01, 0x00,              # Bits per pixel (1)
-          0x00, 0x00, 0x00, 0x00,  # Compression (0 = none)
-          0x00, 0x00, 0x00, 0x00,  # Image size (0 for uncompressed)
-          0x00, 0x00, 0x00, 0x00,  # X pixels per meter (0)
-          0x00, 0x00, 0x00, 0x00,  # Y pixels per meter (0)
-          0x02, 0x00, 0x00, 0x00,  # Colors used (2)
-          0x02, 0x00, 0x00, 0x00   # Important colors (2)
+          # BITMAPINFOHEADER (40 bytes)
+          0x28, 0x00, 0x00, 0x00,  # Header size
+          0x01, 0x00, 0x00, 0x00,  # Width
+          0x02, 0x00, 0x00, 0x00,  # Height (2 = 1 * 2 for XOR and AND masks)
+          0x01, 0x00,              # Planes
+          0x01, 0x00,              # Bits per pixel
+          0x00, 0x00, 0x00, 0x00,  # Compression
+          0x00, 0x00, 0x00, 0x00,  # Image size
+          0x00, 0x00, 0x00, 0x00,  # X pixels per meter
+          0x00, 0x00, 0x00, 0x00,  # Y pixels per meter
+          0x02, 0x00, 0x00, 0x00,  # Colors used
+          0x02, 0x00, 0x00, 0x00,  # Important colors
+
+          # Color table (8 bytes)
+          0x00, 0x00, 0x00, 0x00,  # Black
+          0xFF, 0xFF, 0xFF, 0x00,  # White
+
+          # XOR mask (1 byte padded to 4)
+          0xFF, 0x00, 0x00, 0x00,  # One white pixel, padded
+
+          # AND mask (1 byte padded to 4)
+          0x00, 0x00, 0x00, 0x00   # One opaque pixel, padded
         )
-
-        # Color table (8 bytes)
-        $colorTable = @(
-          0x00, 0x00, 0x00, 0x00,  # Color 0 (black)
-          0xFF, 0xFF, 0xFF, 0x00   # Color 1 (white)
-        )
-
-        # XOR mask (32 bytes, 16x16 pixels, 1 bit per pixel, padded to 32-bit boundary)
-        $xorMask = @(
-          0xFF, 0xFF,  # Row 1-8 (all white)
-          0xFF, 0xFF,  # Row 9-16 (all white)
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF,
-          0xFF, 0xFF
-        )
-
-        # AND mask (32 bytes, 16x16 pixels, 1 bit per pixel, padded to 32-bit boundary)
-        $andMask = @(
-          0x00, 0x00,  # Row 1-8 (all transparent)
-          0x00, 0x00,  # Row 9-16 (all transparent)
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00,
-          0x00, 0x00
-        )
-
-        # Combine all parts
-        $iconData = $icoBytes + $colorTable + $xorMask + $andMask
 
         # Write the icon file
-        [System.IO.File]::WriteAllBytes("$iconDir/icon.ico", $iconData)
+        [System.IO.File]::WriteAllBytes("$iconDir/icon.ico", $icoBytes)
 
         # Verify the file
         $fileInfo = Get-Item "$iconDir/icon.ico"
@@ -309,14 +263,8 @@ jobs:
             Write-Host "Icon file created successfully"
             Write-Host "File size: $($fileInfo.Length) bytes"
             Write-Host "File path: $($fileInfo.FullName)"
-            
-            # Read and display first few bytes to verify header
-            $bytes = [System.IO.File]::ReadAllBytes("$iconDir/icon.ico")
-            Write-Host "First 22 bytes (header + directory entry):"
-            for ($i = 0; $i -lt [Math]::Min(22, $bytes.Length); $i++) {
-                Write-Host ("{0:X2} " -f $bytes[$i]) -NoNewline
-            }
-            Write-Host ""
+            Write-Host "File exists and is readable: $((Test-Path $fileInfo.FullName -PathType Leaf))"
+            Get-Content "$iconDir/icon.ico" -Encoding Byte -TotalCount 22 | ForEach-Object { Write-Host ("{0:X2} " -f $_) -NoNewline }
         } else {
             Write-Error "Failed to create icon file"
             exit 1
