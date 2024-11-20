@@ -1,0 +1,29 @@
+[package]
+name = "vector-analyzer"
+version = "0.0.1"
+description = "Vector Analysis Tool"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.70"
+
+[build-dependencies]
+tauri-build = { version = "1.5.0", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tauri = { version = "1.5.0", features = ["dialog-all", "fs-all"] }
+tokio = { version = "1.28.2", features = ["full"] }
+csv = "1.2"
+pyo3 = { version = "0.19", features = ["auto-initialize"] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"

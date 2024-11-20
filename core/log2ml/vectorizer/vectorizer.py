@@ -3,7 +3,7 @@
 import torch
 from linformer_pytorch import LinformerLM
 from tokenizers import Tokenizer
-from tokenizers.models import WordLevel, BPE
+from tokenizers.models import BPE, WordLevel
 from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.trainers import BpeTrainer
 
@@ -11,27 +11,27 @@ from tokenizers.trainers import BpeTrainer
 def create_linformer_model():
     """Create and initialize Linformer model for vectorization"""
     model = LinformerLM(
-        num_tokens=30000,      # Number of tokens in the LM
-        input_size=700,        # Dimension 1 of the input
-        channels=64,           # Dimension 2 of the input
-        dim_d=None,           # Overwrites the inner dim of the attention heads
-        dim_k=128,            # The second dimension of the P_bar matrix
-        dim_ff=128,           # Dimension in the feed forward network
-        dropout_ff=0.15,      # Dropout for feed forward network
-        nhead=4,              # Number of attention heads
-        depth=2,              # How many times to run the model
-        dropout=0.1,          # How much dropout to apply to P_bar after softmax
-        activation="gelu",    # What activation to use
+        num_tokens=30000,  # Number of tokens in the LM
+        input_size=700,  # Dimension 1 of the input
+        channels=64,  # Dimension 2 of the input
+        dim_d=None,  # Overwrites the inner dim of the attention heads
+        dim_k=128,  # The second dimension of the P_bar matrix
+        dim_ff=128,  # Dimension in the feed forward network
+        dropout_ff=0.15,  # Dropout for feed forward network
+        nhead=4,  # Number of attention heads
+        depth=2,  # How many times to run the model
+        dropout=0.1,  # How much dropout to apply to P_bar after softmax
+        activation="gelu",  # What activation to use
         checkpoint_level="C0",  # What checkpoint level to use
         parameter_sharing="layerwise",  # What level of parameter sharing to use
         k_reduce_by_layer=0,  # Going down depth, how much to reduce dim_k by
         full_attention=False,  # Use full attention instead
-        include_ff=True,      # Whether or not to include the Feed Forward layer
+        include_ff=True,  # Whether or not to include the Feed Forward layer
         w_o_intermediate_dim=None,  # If not None, have 2 w_o matrices
-        emb_dim=128,          # Embedding dimension
-        causal=False,         # If you want this to be a causal Linformer
-        method="learnable",   # The method of how to perform the projection
-        ff_intermediate=None  # Feed forward intermediate dimension
+        emb_dim=128,  # Embedding dimension
+        causal=False,  # If you want this to be a causal Linformer
+        method="learnable",  # The method of how to perform the projection
+        ff_intermediate=None,  # Feed forward intermediate dimension
     )
     return model
 

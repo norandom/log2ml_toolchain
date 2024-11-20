@@ -1,10 +1,7 @@
 import unittest
-from tools.vectorizer import (
-    create_word_tokenizer,
-    create_bpe_tokenizer,
-    process_input,
-    create_linformer_model,
-)
+
+from tools.vectorizer import (create_bpe_tokenizer, create_linformer_model,
+                              create_word_tokenizer, process_input)
 
 
 class TestVectorizer(unittest.TestCase):
@@ -36,5 +33,5 @@ class TestVectorizer(unittest.TestCase):
         self.assertEqual(vector.shape[0], 128)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

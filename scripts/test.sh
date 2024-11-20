@@ -33,6 +33,16 @@ check_dependencies() {
         missing_deps=1
     fi
     
+    if ! command -v black &> /dev/null; then
+        print_error "black is not installed"
+        missing_deps=1
+    fi
+    
+    if ! command -v isort &> /dev/null; then
+        print_error "isort is not installed"
+        missing_deps=1
+    fi
+    
     if [ $missing_deps -eq 1 ]; then
         print_status "Installing missing dependencies..."
         pip install -e ".[dev]"
@@ -43,7 +53,15 @@ check_dependencies() {
 run_linting() {
     print_status "Running linting checks..."
     
-    if ./linter.sh; then
+    # Change to the core package directory
+    cd "$(dirname "$0")/../core" || exit 1
+    
+    echo "Running style checks..."
+    black . --check
+    isort . --check
+    flake8 log2ml/ tests/ --max-line-length=100 --extend-ignore=E203 --statistics
+    
+    if [ $? -eq 0 ]; then
         print_success "Linting passed"
         return 0
     else
@@ -56,7 +74,13 @@ run_linting() {
 run_tests() {
     print_status "Running tests with coverage..."
     
-    if pytest tests/ --cov=tools --cov-report=xml --cov-report=term-missing; then
+    # Change to the core package directory
+    cd "$(dirname "$0")/../core" || exit 1
+    
+    echo "Running tests..."
+    pytest tests/ -v --cov=log2ml --cov-report=xml --cov-report=term-missing
+    
+    if [ $? -eq 0 ]; then
         print_success "All tests passed"
         return 0
     else

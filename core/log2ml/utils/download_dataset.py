@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 
-import sys
 import argparse
 import subprocess
-import pandas as pd
-from pathlib import Path
+import sys
 import zipfile
+from pathlib import Path
+
+import pandas as pd
 
 
 def check_kaggle_credentials():
     """Check for Kaggle credentials file"""
-    kaggle_dir = Path.home() / '.kaggle'
-    kaggle_json = kaggle_dir / 'kaggle.json'
+    kaggle_dir = Path.home() / ".kaggle"
+    kaggle_json = kaggle_dir / "kaggle.json"
     if kaggle_json.exists():
         # Ensure proper permissions
         kaggle_json.chmod(0o600)
@@ -30,17 +31,28 @@ def check_kaggle_credentials():
 def download_dataset():
     """Download the dataset from Kaggle"""
     dataset = "mariusciepluch/log2ml-blindtest-maldoc-activity-capture"
-    filename = "lab_logs_blindtest_activity_sysmon_1000samples_july_28_2024_filtered_clean.csv"
+    filename = (
+        "lab_logs_blindtest_activity_sysmon_1000samples_july_28_2024_filtered_clean.csv"
+    )
     zip_filename = filename + ".zip"
     # Create data directory if it doesn't exist
-    data_dir = Path('data')
+    data_dir = Path("data")
     data_dir.mkdir(exist_ok=True)
     # Download using kaggle API
     try:
         print(f"Downloading dataset from {dataset}...")
         subprocess.run(
-            ['kaggle', 'datasets', 'download', '-d', dataset, '-f', filename, '--unzip'],
-            check=True
+            [
+                "kaggle",
+                "datasets",
+                "download",
+                "-d",
+                dataset,
+                "-f",
+                filename,
+                "--unzip",
+            ],
+            check=True,
         )
         # Move the file to data directory
         src_file = Path(filename)
@@ -49,7 +61,7 @@ def download_dataset():
         zip_file = Path(zip_filename)
         if zip_file.exists():
             print("Extracting zip file...")
-            with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+            with zipfile.ZipFile(zip_file, "r") as zip_ref:
                 zip_ref.extractall(data_dir)
             zip_file.unlink()  # Remove zip file
             print(f"Extracted to {dst_file}")
@@ -77,11 +89,11 @@ def download_dataset():
 
 def main():
     """Main function to handle command line arguments and download the dataset."""
-    parser = argparse.ArgumentParser(description='Download Log2ML dataset from Kaggle')
+    parser = argparse.ArgumentParser(description="Download Log2ML dataset from Kaggle")
     parser.parse_args()
     check_kaggle_credentials()
     download_dataset()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

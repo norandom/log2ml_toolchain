@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Vector Analyzer</h1>
+        
+        <div class="section">
+            <button id="upload-btn" class="btn">Upload CSV</button>
+            <div id="file-name" class="info-text"></div>
+        </div>
+        
+        <div class="section">
+            <h3>Select Model:</h3>
+            <div class="model-selection">
+                <button class="btn model-btn" data-model="Linformer">Linformer</button>
+                <button class="btn model-btn" data-model="Longformer">Longformer</button>
+            </div>
+            <div id="selected-model" class="info-text"></div>
+        </div>
+        
+        <div class="section">
+            <button id="analyze-btn" class="btn primary">Analyze Data</button>
+        </div>
+        
+        <div id="error" class="error"></div>
+    </div>
+    
+    <div id="analysis-dialog" class="dialog">
+        <div class="dialog-content">
+            <button class="close-btn">&times;</button>
+            <div class="charts-container">
+                <!-- Charts will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>

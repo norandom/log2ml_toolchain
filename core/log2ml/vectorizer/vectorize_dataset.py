@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import sys
-import argparse
-import pandas as pd
 from pathlib import Path
-from tools.vectorizer import (
-    create_linformer_model,
-    create_bpe_tokenizer,
-    train_bpe_tokenizer,
-    process_input,
-)
+
+import pandas as pd
+from tools.vectorizer import (create_bpe_tokenizer, create_linformer_model,
+                              process_input, train_bpe_tokenizer)
 
 
 def vectorize_dataset(input_file, output_file, tokenizer_file):
@@ -18,7 +15,7 @@ def vectorize_dataset(input_file, output_file, tokenizer_file):
     # Read the dataset
     print(f"Reading dataset from {input_file}...")
     df = pd.read_csv(input_file)
-    messages = df['text'].tolist()
+    messages = df["text"].tolist()
     # Initialize model
     print("Initializing Linformer model...")
     model = create_linformer_model()
@@ -41,10 +38,7 @@ def vectorize_dataset(input_file, output_file, tokenizer_file):
         vectors.append(vector.tolist())
     # Create output DataFrame
     print("Creating output DataFrame...")
-    output_df = pd.DataFrame({
-        'text': messages,
-        'vector': vectors
-    })
+    output_df = pd.DataFrame({"text": messages, "vector": vectors})
     # Save to parquet
     print(f"Saving to {output_file}...")
     output_df.to_parquet(output_file, index=False)
@@ -54,28 +48,28 @@ def vectorize_dataset(input_file, output_file, tokenizer_file):
 def main():
     """Vectorize Log2ML dataset text using BPE tokenization"""
     parser = argparse.ArgumentParser(
-        description='Convert log files into machine learning-ready vector representations'
+        description="Convert log files into machine learning-ready vector representations"
     )
     parser.add_argument(
-        '--input',
+        "--input",
         type=str,
         default=(
-            'data/lab_logs_blindtest_activity_sysmon_1000samples_'
-            'july_28_2024_filtered_clean.csv'
+            "data/lab_logs_blindtest_activity_sysmon_1000samples_"
+            "july_28_2024_filtered_clean.csv"
         ),
-        help='Input CSV file path'
+        help="Input CSV file path",
     )
     parser.add_argument(
-        '--output',
+        "--output",
         type=str,
-        default='data/vectorized_sysmon_bpe.parquet',
-        help='Output Parquet file path'
+        default="data/vectorized_sysmon_bpe.parquet",
+        help="Output Parquet file path",
     )
     parser.add_argument(
-        '--tokenizer',
+        "--tokenizer",
         type=str,
-        default='tokenizer/sysmon_bpe.json',
-        help='Path to save the trained BPE tokenizer'
+        default="tokenizer/sysmon_bpe.json",
+        help="Path to save the trained BPE tokenizer",
     )
     args = parser.parse_args()
     # Check if input file exists
@@ -89,5 +83,5 @@ def main():
     vectorize_dataset(args.input, args.output, args.tokenizer)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
