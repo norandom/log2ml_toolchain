@@ -115,7 +115,11 @@ jobs:
     - name: Install dependencies (ubuntu only)
       if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
       run: |
+        # Add required repositories
+        sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
         sudo apt-get update
+
+        # Install required packages
         sudo apt-get install -y \
           libgtk-3-dev \
           libwebkit2gtk-4.0-dev \
@@ -134,15 +138,50 @@ jobs:
           libssl-dev \
           pkg-config \
           gtk+3.0 \
-          gir1.2-gtk-3.0
+          gir1.2-gtk-3.0 \
+          libatk-bridge2.0-dev \
+          at-spi2-core \
+          libatk-adaptor
+
+    - name: Configure pkg-config (ubuntu only)
+      if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
+      run: |
+        # Find all relevant pkg-config paths
+        PKG_CONFIG_PATHS=(
+          "/usr/lib/x86_64-linux-gnu/pkgconfig"
+          "/usr/lib/pkgconfig"
+          "/usr/share/pkgconfig"
+          "/usr/local/lib/pkgconfig"
+          "/usr/local/share/pkgconfig"
+        )
+        
+        # Build PKG_CONFIG_PATH string
+        PKG_CONFIG_PATH=$(IFS=:; echo "${PKG_CONFIG_PATHS[*]}")
+        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+        export PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
+        
+        # Debug package configuration
+        echo "Checking ATK package:"
+        pkg-config --exists atk && echo "ATK package found" || echo "ATK package not found"
+        pkg-config --modversion atk || true
+        
+        echo "Checking GDK package:"
+        pkg-config --exists gdk-3.0 && echo "GDK package found" || echo "GDK package not found"
+        pkg-config --modversion gdk-3.0 || true
+        
+        echo "Searching for .pc files:"
+        find /usr -name "atk.pc" 2>/dev/null || true
+        find /usr -name "gdk-3.0.pc" 2>/dev/null || true
+        
+        echo "Installed packages:"
+        dpkg -l | grep -E "atk|gtk|gdk"
+        
+        echo "Available pkg-config packages:"
+        pkg-config --list-all | grep -E "atk|gtk|gdk"
 
     - name: Verify Ubuntu packages
       if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
       run: |
-        # Export PKG_CONFIG_PATH for the session
-        export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
-        
         # List installed GTK packages
         echo "Installed GTK packages:"
         dpkg -l | grep -E "libgtk|gir1.2-gtk|gtk\+3.0"
@@ -163,21 +202,74 @@ jobs:
         echo -e "\nAll available pkg-config packages:"
         pkg-config --list-all | grep -i "gtk\|gdk"
 
-    - name: Create empty icon
-      if: ${{ runner.os == 'Windows' && steps.check_gui.outputs.gui_exists == 'true' }}
+    - name: Create valid icon for Windows
+      if: ${{ steps.check_gui.outputs.gui_exists == 'true' && matrix.platform == 'windows-latest' }}
       shell: pwsh
       run: |
+        # Create a directory for the icon if it doesn't exist
         $iconDir = "gui/vector-analyzer/src-tauri/icons"
-        if (-not (Test-Path $iconDir)) {
-          New-Item -ItemType Directory -Force -Path $iconDir
+        New-Item -ItemType Directory -Force -Path $iconDir
+
+        # Create a minimal valid 32x32 ICO file
+        $icoBytes = @(
+          # ICO header
+          0x00, 0x00,  # Reserved
+          0x01, 0x00,  # Image type (1 = ICO)
+          0x01, 0x00,  # Number of images
+          
+          # Directory entry
+          0x20, 0x00,  # Width (32)
+          0x20, 0x00,  # Height (32)
+          0x00,        # Color palette
+          0x00,        # Reserved
+          0x01, 0x00,  # Color planes
+          0x20, 0x00,  # Bits per pixel (32)
+          0x68, 0x04, 0x00, 0x00,  # Size of image data (1128 bytes)
+          0x16, 0x00, 0x00, 0x00   # Offset to image data
+        )
+        
+        # Add minimal BMP data (BITMAPINFOHEADER)
+        $bmpHeader = @(
+          0x28, 0x00, 0x00, 0x00,  # Size of header (40 bytes)
+          0x20, 0x00, 0x00, 0x00,  # Width (32)
+          0x40, 0x00, 0x00, 0x00,  # Height (64 = 32 * 2 for XOR and AND masks)
+          0x01, 0x00,              # Planes (1)
+          0x20, 0x00,              # Bits per pixel (32)
+          0x00, 0x00, 0x00, 0x00,  # Compression (0 = none)
+          0x00, 0x00, 0x00, 0x00,  # Image size (0 for uncompressed)
+          0x00, 0x00, 0x00, 0x00,  # X pixels per meter
+          0x00, 0x00, 0x00, 0x00,  # Y pixels per meter
+          0x00, 0x00, 0x00, 0x00,  # Colors used
+          0x00, 0x00, 0x00, 0x00   # Important colors
+        )
+        
+        # Create image data (32x32 pixels, BGRA format)
+        $imageData = New-Object byte[] 4096  # 32 * 32 * 4 bytes per pixel
+        for ($i = 0; $i -lt $imageData.Length; $i += 4) {
+          # Set each pixel to white with full opacity
+          $imageData[$i] = 0xFF     # Blue
+          $imageData[$i + 1] = 0xFF # Green
+          $imageData[$i + 2] = 0xFF # Red
+          $imageData[$i + 3] = 0xFF # Alpha
         }
-        # Create a minimal valid .ico file
-        $iconBytes = [byte[]]@(
-          0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x10, 0x10,
-          0x00, 0x00, 0x01, 0x00, 0x20, 0x00, 0x68, 0x04,
-          0x00, 0x00, 0x16, 0x00, 0x00, 0x00
-        ) + (New-Object byte[] 1024)
-        [System.IO.File]::WriteAllBytes("$iconDir/icon.ico", $iconBytes)
+        
+        # Create mask data (32x32 pixels, 1 bit per pixel, padded to 32-bit boundary)
+        $maskData = New-Object byte[] 128  # (32 * 32) / 8 bytes
+        
+        # Combine all parts
+        $iconData = $icoBytes + $bmpHeader + $imageData + $maskData
+        
+        # Write the icon file
+        [System.IO.File]::WriteAllBytes("$iconDir/icon.ico", $iconData)
+        
+        # Verify the file was created
+        if (Test-Path "$iconDir/icon.ico") {
+          Write-Host "Icon file created successfully"
+          Write-Host "File size: $((Get-Item "$iconDir/icon.ico").Length) bytes"
+        } else {
+          Write-Error "Failed to create icon file"
+          exit 1
+        }
 
     - name: Install dependencies (macos only)
       if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'macos-latest' }}
