@@ -145,65 +145,109 @@ jobs:
           libglib2.0-dev \
           libgtk-3-0 \
           libgtk-3-common \
+          libgtk-3-dev \
           libgtk-3-bin \
           libgdk3.0-cil \
           libgdk3.0-cil-dev \
           libgdk-pixbuf2.0-0 \
           libgdk-pixbuf2.0-common \
-          libgdk-pixbuf2.0-dev
+          libgdk-pixbuf2.0-dev \
+          gir1.2-gdkpixbuf-2.0
 
-    - name: Configure pkg-config and environment (ubuntu only)
+    - name: Configure pkg-config for GDK (ubuntu only)
       if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
       run: |
-        # Create a list of potential pkg-config paths
-        PKG_CONFIG_PATHS=(
-          "/usr/lib/x86_64-linux-gnu/pkgconfig"
-          "/usr/share/pkgconfig"
-          "/usr/lib/pkgconfig"
-          "/usr/local/lib/pkgconfig"
-          "/usr/local/share/pkgconfig"
-          "/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders"
-        )
+        # First, find the actual gdk-3.0.pc file
+        echo "Searching for gdk-3.0.pc..."
+        GDK_PC_FILE=$(find /usr -name "gdk-3.0.pc" 2>/dev/null | head -n 1)
+        echo "Found GDK PC file at: $GDK_PC_FILE"
         
-        # Export PKG_CONFIG_PATH
-        export PKG_CONFIG_PATH=$(IFS=:; echo "${PKG_CONFIG_PATHS[*]}")
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+        if [ -n "$GDK_PC_FILE" ]; then
+          GDK_PC_DIR=$(dirname "$GDK_PC_FILE")
+          echo "GDK PC directory: $GDK_PC_DIR"
+          
+          # Set PKG_CONFIG_PATH to include the directory containing gdk-3.0.pc
+          export PKG_CONFIG_PATH="$GDK_PC_DIR:${PKG_CONFIG_PATH:-}"
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          
+          echo "Verifying pkg-config setup:"
+          pkg-config --validate gdk-3.0 || true
+          pkg-config --libs --cflags gdk-3.0 || true
+        else
+          echo "gdk-3.0.pc not found, installing missing packages..."
+          sudo apt-get update
+          sudo apt-get install -y --fix-missing \
+            libgtk-3-dev \
+            libgdk-pixbuf2.0-dev
+        fi
         
-        # Set additional environment variables
-        echo "GDK_PIXBUF_MODULEDIR=/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders" >> $GITHUB_ENV
-        echo "GDK_PIXBUF_MODULE_FILE=/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders.cache" >> $GITHUB_ENV
-        
-        # Update GDK pixbuf loaders cache
-        sudo gdk-pixbuf-query-loaders --update-cache
-        
-        # Create symbolic links for important .pc files if they don't exist in standard locations
-        for pc_file in atk.pc gdk-3.0.pc gtk+-3.0.pc; do
-          source_file=$(find /usr -name "$pc_file" 2>/dev/null | head -n 1)
-          if [ -n "$source_file" ]; then
-            for pkg_dir in "${PKG_CONFIG_PATHS[@]}"; do
-              sudo mkdir -p "$pkg_dir"
-              if [ ! -f "$pkg_dir/$pc_file" ]; then
-                sudo ln -sf "$source_file" "$pkg_dir/$pc_file"
-                echo "Created symlink for $pc_file in $pkg_dir"
-              fi
-            done
+        # Create symbolic links if needed
+        for pc_dir in /usr/lib/x86_64-linux-gnu/pkgconfig /usr/share/pkgconfig /usr/lib/pkgconfig; do
+          sudo mkdir -p "$pc_dir"
+          if [ -f "$GDK_PC_FILE" ] && [ ! -f "$pc_dir/gdk-3.0.pc" ]; then
+            sudo ln -sf "$GDK_PC_FILE" "$pc_dir/gdk-3.0.pc"
+            echo "Created symlink for gdk-3.0.pc in $pc_dir"
           fi
         done
         
-        # Verify GDK and GTK installation
-        echo "Verifying GDK/GTK installation:"
-        pkg-config --modversion gdk-3.0 || echo "gdk-3.0 not found"
-        pkg-config --modversion gtk+-3.0 || echo "gtk+-3.0 not found"
+        # Set additional environment variables
+        echo "Setting additional environment variables..."
+        export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1
+        export PKG_CONFIG_ALLOW_SYSTEM_LIBS=1
+        echo "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1" >> $GITHUB_ENV
+        echo "PKG_CONFIG_ALLOW_SYSTEM_LIBS=1" >> $GITHUB_ENV
         
-        echo "Package locations:"
-        find /usr -name "gdk*.pc" 2>/dev/null || echo "No GDK .pc files found"
-        find /usr -name "gtk*.pc" 2>/dev/null || echo "No GTK .pc files found"
+        # Debug information
+        echo "Current environment:"
+        env | grep -i "pkg_config"
         
-        echo "Library status:"
-        ldconfig -p | grep -E "libgdk|libgtk"
+        echo "pkg-config version:"
+        pkg-config --version
         
-        echo "Package config paths:"
+        echo "pkg-config search path:"
         pkg-config --variable pc_path pkg-config
+        
+        echo "GDK version info:"
+        pkg-config --modversion gdk-3.0 || echo "GDK version check failed"
+        
+        echo "GDK library info:"
+        pkg-config --libs --cflags gdk-3.0 || echo "GDK library check failed"
+        
+        echo "System libraries:"
+        ldconfig -p | grep -i "libgdk"
+        
+        echo "Available .pc files:"
+        find /usr -name "*.pc" | grep -i "gdk"
+
+    - name: Verify GDK installation
+      if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
+      run: |
+        echo "Testing GDK installation..."
+        
+        # Check if pkg-config can find GDK
+        if pkg-config --exists gdk-3.0; then
+          echo "GDK found by pkg-config"
+          echo "Version: $(pkg-config --modversion gdk-3.0)"
+          echo "Cflags: $(pkg-config --cflags gdk-3.0)"
+          echo "Libs: $(pkg-config --libs gdk-3.0)"
+        else
+          echo "GDK not found by pkg-config"
+          echo "Current PKG_CONFIG_PATH: $PKG_CONFIG_PATH"
+          echo "Available .pc files in standard locations:"
+          find /usr/lib/x86_64-linux-gnu/pkgconfig /usr/share/pkgconfig -name "*.pc"
+        fi
+        
+        # Test GTK/GDK functionality
+        echo "Testing GTK/GDK compilation..."
+        cat << 'EOF' > test.c
+        #include <gtk/gtk.h>
+        int main(int argc, char *argv[]) {
+          gtk_init(&argc, &argv);
+          return 0;
+        }
+        EOF
+        
+        gcc -o test test.c $(pkg-config --cflags --libs gtk+-3.0) || echo "Compilation failed"
 
     - name: Create valid icon for Windows
       if: ${{ steps.check_gui.outputs.gui_exists == 'true' && matrix.platform == 'windows-latest' }}
@@ -213,58 +257,83 @@ jobs:
         $iconDir = "gui/vector-analyzer/src-tauri/icons"
         New-Item -ItemType Directory -Force -Path $iconDir
 
-        # Create a 1x1 pixel ICO file (absolute minimum size)
-        $icoBytes = @(
-          # ICO Header (6 bytes)
-          0x00, 0x00,  # Reserved
-          0x01, 0x00,  # Type (1 = ICO)
-          0x01, 0x00,  # Number of images
+        # Create a standard 32x32 icon with proper bitmap structure
+        $iconBytes = [byte[]]@(
+            # ICO Header (6 bytes)
+            0x00, 0x00,              # Reserved
+            0x01, 0x00,              # Type (1 = ICO)
+            0x01, 0x00,              # Number of images
 
-          # Directory Entry (16 bytes)
-          0x01, 0x00,  # Width (1 pixel)
-          0x01, 0x00,  # Height (1 pixel)
-          0x00,        # Color palette
-          0x00,        # Reserved
-          0x01, 0x00,  # Color planes
-          0x01, 0x00,  # Bits per pixel (1)
-          0x2C, 0x00, 0x00, 0x00,  # Size of image data (44 bytes)
-          0x16, 0x00, 0x00, 0x00,  # Offset to image data
+            # Directory Entry (16 bytes)
+            0x20,                    # Width (32 pixels)
+            0x20,                    # Height (32 pixels)
+            0x00,                    # Color count (0 = 256)
+            0x00,                    # Reserved
+            0x01, 0x00,             # Color planes
+            0x20, 0x00,             # Bits per pixel (32)
+            0x28, 0x10, 0x00, 0x00, # Size of image data (4136 bytes = 40 + 32*32*4)
+            0x16, 0x00, 0x00, 0x00  # Offset to image data (22 bytes)
 
-          # BITMAPINFOHEADER (40 bytes)
-          0x28, 0x00, 0x00, 0x00,  # Header size
-          0x01, 0x00, 0x00, 0x00,  # Width
-          0x02, 0x00, 0x00, 0x00,  # Height (2 = 1 * 2 for XOR and AND masks)
-          0x01, 0x00,              # Planes
-          0x01, 0x00,              # Bits per pixel
-          0x00, 0x00, 0x00, 0x00,  # Compression
-          0x00, 0x00, 0x00, 0x00,  # Image size
-          0x00, 0x00, 0x00, 0x00,  # X pixels per meter
-          0x00, 0x00, 0x00, 0x00,  # Y pixels per meter
-          0x02, 0x00, 0x00, 0x00,  # Colors used
-          0x02, 0x00, 0x00, 0x00,  # Important colors
-
-          # Color table (8 bytes)
-          0x00, 0x00, 0x00, 0x00,  # Black
-          0xFF, 0xFF, 0xFF, 0x00,  # White
-
-          # XOR mask (1 byte padded to 4)
-          0xFF, 0x00, 0x00, 0x00,  # One white pixel, padded
-
-          # AND mask (1 byte padded to 4)
-          0x00, 0x00, 0x00, 0x00   # One opaque pixel, padded
+            # BITMAPINFOHEADER (40 bytes)
+            0x28, 0x00, 0x00, 0x00, # Size of header (40 bytes)
+            0x20, 0x00, 0x00, 0x00, # Width (32 pixels)
+            0x40, 0x00, 0x00, 0x00, # Height (64 pixels = 32 * 2 for XOR and AND masks)
+            0x01, 0x00,             # Planes (1)
+            0x20, 0x00,             # Bits per pixel (32)
+            0x00, 0x00, 0x00, 0x00, # Compression (0 = none)
+            0x00, 0x10, 0x00, 0x00, # Image size (4096 bytes = 32*32*4)
+            0x00, 0x00, 0x00, 0x00, # X pixels per meter
+            0x00, 0x00, 0x00, 0x00, # Y pixels per meter
+            0x00, 0x00, 0x00, 0x00, # Colors used (0)
+            0x00, 0x00, 0x00, 0x00  # Important colors (0)
         )
 
+        # Add XOR mask (32x32 pixels, 32-bit BGRA)
+        $xorMask = New-Object byte[] 4096  # 32 * 32 * 4 bytes
+        for ($i = 0; $i -lt $xorMask.Length; $i += 4) {
+            # White pixel with full opacity
+            $xorMask[$i + 0] = 0xFF  # Blue
+            $xorMask[$i + 1] = 0xFF  # Green
+            $xorMask[$i + 2] = 0xFF  # Red
+            $xorMask[$i + 3] = 0xFF  # Alpha
+        }
+        $iconBytes += $xorMask
+
+        # Add AND mask (32x32 pixels, 1-bit monochrome, padded to 32-bit boundary)
+        $andMask = New-Object byte[] 128  # (32 * 32) / 8 bytes, padded
+        for ($i = 0; $i -lt $andMask.Length; $i++) {
+            $andMask[$i] = 0x00  # All pixels opaque
+        }
+        $iconBytes += $andMask
+
         # Write the icon file
-        [System.IO.File]::WriteAllBytes("$iconDir/icon.ico", $icoBytes)
+        [System.IO.File]::WriteAllBytes("$iconDir/icon.ico", $iconBytes)
 
         # Verify the file
         $fileInfo = Get-Item "$iconDir/icon.ico"
         if ($fileInfo.Exists) {
             Write-Host "Icon file created successfully"
             Write-Host "File size: $($fileInfo.Length) bytes"
+            Write-Host "Expected size: 4264 bytes (22 + 40 + 4096 + 128)"
             Write-Host "File path: $($fileInfo.FullName)"
-            Write-Host "File exists and is readable: $((Test-Path $fileInfo.FullName -PathType Leaf))"
-            Get-Content "$iconDir/icon.ico" -Encoding Byte -TotalCount 22 | ForEach-Object { Write-Host ("{0:X2} " -f $_) -NoNewline }
+            
+            # Display header contents for verification
+            $bytes = [System.IO.File]::ReadAllBytes("$iconDir/icon.ico")
+            Write-Host "File header (first 62 bytes - ICO header + Directory Entry + BITMAPINFOHEADER):"
+            for ($i = 0; $i -lt [Math]::Min(62, $bytes.Length); $i++) {
+                Write-Host ("{0:X2} " -f $bytes[$i]) -NoNewline
+                if (($i + 1) % 16 -eq 0) { Write-Host "" }
+            }
+            Write-Host "`nVerifying image data..."
+            Write-Host "XOR mask starts at offset 62, length: 4096"
+            Write-Host "AND mask starts at offset 4158, length: 128"
+            
+            # Verify file integrity
+            if ($bytes.Length -eq 4264) {
+                Write-Host "File size matches expected size"
+            } else {
+                Write-Host "Warning: File size mismatch. Expected 4264, got $($bytes.Length)"
+            }
         } else {
             Write-Error "Failed to create icon file"
             exit 1
