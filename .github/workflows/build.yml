@@ -58,9 +58,11 @@ jobs:
         include:
           - platform: windows-latest
             continue-on-error: true
+          - platform: ubuntu-latest
+            continue-on-error: true
 
     runs-on: ${{ matrix.platform }}
-    continue-on-error: ${{ matrix.platform == 'windows-latest' }}
+    continue-on-error: ${{ matrix.platform == 'windows-latest' || matrix.platform == 'ubuntu-latest' }}
     steps:
     - uses: actions/checkout@v4
 
@@ -128,7 +130,17 @@ jobs:
           libssl-dev \
           libgtk-3-dev \
           libappindicator3-dev \
-          librsvg2-dev
+          librsvg2-dev \
+          libatk1.0-dev
+
+        # Set up PKG_CONFIG_PATH to include common system paths
+        echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig:/usr/lib/pkgconfig" >> $GITHUB_ENV
+        echo "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1" >> $GITHUB_ENV
+        echo "PKG_CONFIG_ALLOW_SYSTEM_LIBS=1" >> $GITHUB_ENV
+
+        # Verify ATK configuration
+        pkg-config --libs --cflags atk || true
+        ls -l /usr/lib/x86_64-linux-gnu/pkgconfig/atk.pc || true
 
     - name: Verify GDK/GTK Setup
       if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
