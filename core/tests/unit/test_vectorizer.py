@@ -1,7 +1,8 @@
 import unittest
 
-from tools.vectorizer import (create_bpe_tokenizer, create_linformer_model,
-                              create_word_tokenizer, process_input)
+from log2ml.vectorizer.vectorizer import (create_bpe_tokenizer,
+                                          create_linformer_model,
+                                          create_word_tokenizer, process_input)
 
 
 class TestVectorizer(unittest.TestCase):

@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Notebook converter module for converting Jupyter notebooks to Python modules."""
 
-import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Tuple
 
 import nbformat
-from nbconvert import PythonExporter
 
 
 def convert_notebook_to_module(
@@ -80,7 +79,7 @@ def convert_notebook_to_module(
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: notebook_converter.py <notebook_path> [output_path]")
+        print("Usage: python notebook_converter.py <notebook_path> [output_path]")
         sys.exit(1)
 
     notebook_path = sys.argv[1]
