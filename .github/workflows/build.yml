@@ -132,12 +132,52 @@ jobs:
           wget \
           file \
           libssl-dev \
-          pkg-config
-        # Find and set PKG_CONFIG_PATH
-        echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig" >> $GITHUB_ENV
-        # Verify GDK package is found
-        pkg-config --exists gdk-3.0 && echo "GDK package found" || echo "GDK package not found"
-        pkg-config --list-all | grep gdk
+          pkg-config \
+          gtk+3.0 \
+          gir1.2-gtk-3.0
+
+    - name: Verify Ubuntu packages
+      if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
+      run: |
+        # Export PKG_CONFIG_PATH for the session
+        export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
+        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+        
+        # List installed GTK packages
+        echo "Installed GTK packages:"
+        dpkg -l | grep -E "libgtk|gir1.2-gtk|gtk\+3.0"
+        
+        # Debug pkg-config
+        echo -e "\npkg-config debug info:"
+        pkg-config --debug 2>&1 gdk-3.0 || true
+        
+        # Find gdk-3.0.pc
+        echo -e "\nSearching for gdk-3.0.pc:"
+        find /usr -name "gdk-3.0.pc" 2>/dev/null || true
+        
+        # Check GTK version
+        echo -e "\nGTK version info:"
+        pkg-config --modversion gtk+-3.0 || true
+        
+        # List all available packages
+        echo -e "\nAll available pkg-config packages:"
+        pkg-config --list-all | grep -i "gtk\|gdk"
+
+    - name: Create empty icon
+      if: ${{ runner.os == 'Windows' && steps.check_gui.outputs.gui_exists == 'true' }}
+      shell: pwsh
+      run: |
+        $iconDir = "gui/vector-analyzer/src-tauri/icons"
+        if (-not (Test-Path $iconDir)) {
+          New-Item -ItemType Directory -Force -Path $iconDir
+        }
+        # Create a minimal valid .ico file
+        $iconBytes = [byte[]]@(
+          0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x10, 0x10,
+          0x00, 0x00, 0x01, 0x00, 0x20, 0x00, 0x68, 0x04,
+          0x00, 0x00, 0x16, 0x00, 0x00, 0x00
+        ) + (New-Object byte[] 1024)
+        [System.IO.File]::WriteAllBytes("$iconDir/icon.ico", $iconBytes)
 
     - name: Install dependencies (macos only)
       if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'macos-latest' }}
