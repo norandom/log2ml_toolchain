@@ -62,40 +62,58 @@ jobs:
 
     - name: Check GUI directory
       id: check_gui
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
       run: |
-        if [ "$RUNNER_OS" = "Windows" ]; then
-          pwsh -Command "if ((Test-Path 'gui/vector-analyzer') -and (Test-Path 'gui/vector-analyzer/package.json')) { 'gui_exists=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append } else { 'gui_exists=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append; Write-Host 'GUI directory or package.json not found - skipping Tauri build'; exit 0 }"
+        $ErrorActionPreference = 'Stop'
+        if ((Test-Path 'gui/vector-analyzer') -and (Test-Path 'gui/vector-analyzer/package.json')) {
+          "gui_exists=true" >> $env:GITHUB_OUTPUT
+        } else {
+          "gui_exists=false" >> $env:GITHUB_OUTPUT
+          Write-Host "GUI directory or package.json not found - skipping Tauri build"
+          exit 0
+        }
+      if: runner.os == 'Windows'
+
+    - name: Check GUI directory (Unix)
+      id: check_gui_unix
+      shell: bash
+      run: |
+        if [ -d "gui/vector-analyzer" ] && [ -f "gui/vector-analyzer/package.json" ]; then
+          echo "gui_exists=true" >> $GITHUB_OUTPUT
         else
-          if [ -d "gui/vector-analyzer" ] && [ -f "gui/vector-analyzer/package.json" ]; then
-            echo "gui_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "gui_exists=false" >> $GITHUB_OUTPUT
-            echo "GUI directory or package.json not found - skipping Tauri build"
-            exit 0
-          fi
+          echo "gui_exists=false" >> $GITHUB_OUTPUT
+          echo "GUI directory or package.json not found - skipping Tauri build"
+          exit 0
         fi
+      if: runner.os != 'Windows'
 
     - name: Setup node
-      if: steps.check_gui.outputs.gui_exists == 'true'
+      if: |
+        (runner.os == 'Windows' && steps.check_gui.outputs.gui_exists == 'true') ||
+        (runner.os != 'Windows' && steps.check_gui_unix.outputs.gui_exists == 'true')
       uses: actions/setup-node@v4
       with:
         node-version: 20
 
     - name: Install Rust stable
-      if: steps.check_gui.outputs.gui_exists == 'true'
+      if: |
+        (runner.os == 'Windows' && steps.check_gui.outputs.gui_exists == 'true') ||
+        (runner.os != 'Windows' && steps.check_gui_unix.outputs.gui_exists == 'true')
       uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy
 
     - name: Rust lint
-      if: steps.check_gui.outputs.gui_exists == 'true'
+      if: |
+        (runner.os == 'Windows' && steps.check_gui.outputs.gui_exists == 'true') ||
+        (runner.os != 'Windows' && steps.check_gui_unix.outputs.gui_exists == 'true')
       run: |
         cd gui/vector-analyzer/src-tauri
         cargo fmt --check
         cargo clippy -- -D warnings
 
     - name: Install dependencies (ubuntu only)
-      if: ${{ steps.check_gui.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
+      if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -115,22 +133,29 @@ jobs:
           file \
           libssl-dev \
           pkg-config
-        # Set PKG_CONFIG_PATH to include common locations
-        echo "PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+        # Find and set PKG_CONFIG_PATH
+        echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig" >> $GITHUB_ENV
+        # Verify GDK package is found
+        pkg-config --exists gdk-3.0 && echo "GDK package found" || echo "GDK package not found"
+        pkg-config --list-all | grep gdk
 
     - name: Install dependencies (macos only)
-      if: ${{ steps.check_gui.outputs.gui_exists == 'true' && matrix.platform == 'macos-latest' }}
+      if: ${{ steps.check_gui_unix.outputs.gui_exists == 'true' && matrix.platform == 'macos-latest' }}
       run: |
         brew install pkg-config
 
     - name: Install frontend dependencies
-      if: steps.check_gui.outputs.gui_exists == 'true'
+      if: |
+        (runner.os == 'Windows' && steps.check_gui.outputs.gui_exists == 'true') ||
+        (runner.os != 'Windows' && steps.check_gui_unix.outputs.gui_exists == 'true')
       run: |
         cd gui/vector-analyzer
         yarn install
 
     - name: Build Tauri app
-      if: steps.check_gui.outputs.gui_exists == 'true'
+      if: |
+        (runner.os == 'Windows' && steps.check_gui.outputs.gui_exists == 'true') ||
+        (runner.os != 'Windows' && steps.check_gui_unix.outputs.gui_exists == 'true')
       run: |
         cd gui/vector-analyzer
         yarn run tauri:build
