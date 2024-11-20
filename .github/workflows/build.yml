@@ -94,7 +94,28 @@ jobs:
       if: ${{ steps.check_gui.outputs.gui_exists == 'true' && matrix.platform == 'ubuntu-latest' }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+        sudo apt-get install -y \
+          libgtk-3-dev \
+          libwebkit2gtk-4.0-dev \
+          libappindicator3-dev \
+          librsvg2-dev \
+          patchelf \
+          libatk1.0-dev \
+          libgdk-pixbuf2.0-dev \
+          libcairo2-dev \
+          libsoup2.4-dev \
+          libpango1.0-dev \
+          build-essential \
+          curl \
+          wget \
+          file \
+          libssl-dev \
+          pkg-config
+
+    - name: Install dependencies (macos only)
+      if: ${{ steps.check_gui.outputs.gui_exists == 'true' && matrix.platform == 'macos-latest' }}
+      run: |
+        brew install gtk+3 webkitgtk pkg-config
 
     - name: Install frontend dependencies
       if: steps.check_gui.outputs.gui_exists == 'true'
