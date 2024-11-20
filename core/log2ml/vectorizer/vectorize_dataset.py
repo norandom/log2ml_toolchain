@@ -13,7 +13,9 @@ from log2ml.vectorizer.vectorizer import (
     process_input,
 )
 
-def vectorize_dataset(input_file, output_file, tokenizer_file):
+def vectorize_dataset(
+    input_file, output_file, tokenizer_file
+):
     """Vectorize the text column of the dataset using BPE tokenization"""
     # Read the dataset
     df = pd.read_csv(input_file)
