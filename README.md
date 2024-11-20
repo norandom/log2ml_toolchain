@@ -1,8 +1,8 @@
 # Log2ML Toolchain
 
 ### Build Status
-[![Build and Test](https://github.com/mc/log2ml_toolchain/actions/workflows/build.yml/badge.svg)](https://github.com/mc/log2ml_toolchain/actions/workflows/build.yml)
-[![codecov](https://codecov.io/gh/mc/log2ml_toolchain/branch/main/graph/badge.svg)](https://codecov.io/gh/mc/log2ml_toolchain)
+[![Build and Test](https://github.com/norandom/log2ml_toolchain/actions/workflows/build.yml/badge.svg)](https://github.com/norandom/log2ml_toolchain/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/norandom/log2ml_toolchain/branch/main/graph/badge.svg)](https://codecov.io/gh/norandom/log2ml_toolchain)
 
 ### Code Quality
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
