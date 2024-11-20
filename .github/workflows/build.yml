@@ -59,7 +59,6 @@ jobs:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   tauri-build:
-    if: ${{ github.event_name != 'pull_request' || hashFiles('gui/vector-analyzer/package.json') != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -72,10 +71,12 @@ jobs:
     - name: Check GUI directory
       id: check_gui
       run: |
-        if [ -d "gui/vector-analyzer" ]; then
+        if [ -d "gui/vector-analyzer" ] && [ -f "gui/vector-analyzer/package.json" ]; then
           echo "gui_exists=true" >> $GITHUB_OUTPUT
         else
           echo "gui_exists=false" >> $GITHUB_OUTPUT
+          echo "GUI directory or package.json not found - skipping Tauri build"
+          exit 0
         fi
 
     - name: Setup node
