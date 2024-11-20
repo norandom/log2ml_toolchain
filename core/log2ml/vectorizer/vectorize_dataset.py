@@ -7,10 +7,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from log2ml.vectorizer.vectorizer import (create_bpe_tokenizer,
-                                          create_linformer_model,
-                                          process_input)
-
+from log2ml.vectorizer.vectorizer import (
+    create_bpe_tokenizer,
+    create_linformer_model,
+    process_input,
+)
 
 def vectorize_dataset(input_file, output_file, tokenizer_file):
     """Vectorize the text column of the dataset using BPE tokenization"""
