@@ -60,9 +60,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Check GUI directory
+    - name: Check GUI directory (Windows)
       id: check_gui
-      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
       run: |
         $ErrorActionPreference = 'Stop'
         if ((Test-Path 'gui/vector-analyzer') -and (Test-Path 'gui/vector-analyzer/package.json')) {
@@ -72,10 +73,10 @@ jobs:
           Write-Host "GUI directory or package.json not found - skipping Tauri build"
           exit 0
         }
-      if: runner.os == 'Windows'
 
     - name: Check GUI directory (Unix)
       id: check_gui_unix
+      if: ${{ runner.os != 'Windows' }}
       shell: bash
       run: |
         if [ -d "gui/vector-analyzer" ] && [ -f "gui/vector-analyzer/package.json" ]; then
@@ -85,7 +86,6 @@ jobs:
           echo "GUI directory or package.json not found - skipping Tauri build"
           exit 0
         fi
-      if: runner.os != 'Windows'
 
     - name: Setup node
       if: |
