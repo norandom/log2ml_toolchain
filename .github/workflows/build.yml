@@ -63,12 +63,16 @@ jobs:
     - name: Check GUI directory
       id: check_gui
       run: |
-        if [ -d "gui/vector-analyzer" ] && [ -f "gui/vector-analyzer/package.json" ]; then
-          echo "gui_exists=true" >> $GITHUB_OUTPUT
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          pwsh -Command "if ((Test-Path 'gui/vector-analyzer') -and (Test-Path 'gui/vector-analyzer/package.json')) { 'gui_exists=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append } else { 'gui_exists=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append; Write-Host 'GUI directory or package.json not found - skipping Tauri build'; exit 0 }"
         else
-          echo "gui_exists=false" >> $GITHUB_OUTPUT
-          echo "GUI directory or package.json not found - skipping Tauri build"
-          exit 0
+          if [ -d "gui/vector-analyzer" ] && [ -f "gui/vector-analyzer/package.json" ]; then
+            echo "gui_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "gui_exists=false" >> $GITHUB_OUTPUT
+            echo "GUI directory or package.json not found - skipping Tauri build"
+            exit 0
+          fi
         fi
 
     - name: Setup node
@@ -111,11 +115,13 @@ jobs:
           file \
           libssl-dev \
           pkg-config
+        # Set PKG_CONFIG_PATH to include common locations
+        echo "PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
 
     - name: Install dependencies (macos only)
       if: ${{ steps.check_gui.outputs.gui_exists == 'true' && matrix.platform == 'macos-latest' }}
       run: |
-        brew install gtk+3 webkitgtk pkg-config
+        brew install pkg-config
 
     - name: Install frontend dependencies
       if: steps.check_gui.outputs.gui_exists == 'true'
